@@ -11,6 +11,7 @@ mod output_plan;
 mod parquet;
 mod plan;
 mod runner;
+mod s3_writer;
 mod spatial_config_file;
 mod statistics;
 mod tbl;
@@ -384,6 +385,13 @@ impl IntoSize for BufWriter<File> {
     }
 }
 
+impl IntoSize for s3_writer::S3Writer {
+    fn into_size(self) -> Result<usize, io::Error> {
+        // Return the buffer size before finishing
+        Ok(self.buffer_size())
+    }
+}
+
 /// Wrapper around a buffer writer that counts the number of buffers and bytes written
 struct WriterSink<W: Write> {
     statistics: WriteStatistics,
@@ -408,5 +416,34 @@ impl<W: Write + Send> Sink for WriterSink<W> {
 
     fn flush(mut self) -> Result<(), io::Error> {
         self.inner.flush()
+    }
+}
+
+/// Async wrapper for S3Writer to handle async finalization
+pub struct AsyncWriterSink {
+    statistics: WriteStatistics,
+    inner: s3_writer::S3Writer,
+}
+
+impl AsyncWriterSink {
+    pub fn new(inner: s3_writer::S3Writer) -> Self {
+        Self {
+            inner,
+            statistics: WriteStatistics::new("buffers"),
+        }
+    }
+}
+
+impl generate::AsyncSink for AsyncWriterSink {
+    fn sink(&mut self, buffer: &[u8]) -> Result<(), io::Error> {
+        self.statistics.increment_chunks(1);
+        self.statistics.increment_bytes(buffer.len());
+        self.inner.write_all(buffer)
+    }
+
+    async fn async_flush(mut self) -> Result<(), io::Error> {
+        self.inner.flush()?;
+        self.inner.finish().await?;
+        Ok(())
     }
 }

@@ -18,6 +18,8 @@ pub enum OutputLocation {
     File(PathBuf),
     /// Output to stdout
     Stdout,
+    /// Output to S3
+    S3(String),
 }
 
 impl Display for OutputLocation {
@@ -31,6 +33,10 @@ impl Display for OutputLocation {
                 write!(f, "{}", file.to_string_lossy())
             }
             OutputLocation::Stdout => write!(f, "Stdout"),
+            OutputLocation::S3(uri) => {
+                // Display the S3 URI
+                write!(f, "{}", uri)
+            }
         }
     }
 }
@@ -265,17 +271,31 @@ impl OutputPlanGenerator {
                 OutputFormat::Parquet => "parquet",
             };
 
-            let mut output_path = self.output_dir.clone();
-            if let Some(part) = part {
-                // If a partition is specified, create a subdirectory for it
-                output_path.push(table.to_string());
-                self.ensure_directory_exists(&output_path)?;
-                output_path.push(format!("{table}.{part}.{extension}"));
+            // Check if output_dir is an S3 URI
+            let output_dir_str = self.output_dir.to_string_lossy();
+            if output_dir_str.starts_with("s3://") {
+                // Handle S3 path
+                let base_uri = output_dir_str.trim_end_matches('/');
+                let s3_uri = if let Some(part) = part {
+                    format!("{base_uri}/{table}/{table}.{part}.{extension}")
+                } else {
+                    format!("{base_uri}/{table}.{extension}")
+                };
+                Ok(OutputLocation::S3(s3_uri))
             } else {
-                // No partition specified, output to a single file
-                output_path.push(format!("{table}.{extension}"));
+                // Handle local filesystem path
+                let mut output_path = self.output_dir.clone();
+                if let Some(part) = part {
+                    // If a partition is specified, create a subdirectory for it
+                    output_path.push(table.to_string());
+                    self.ensure_directory_exists(&output_path)?;
+                    output_path.push(format!("{table}.{part}.{extension}"));
+                } else {
+                    // No partition specified, output to a single file
+                    output_path.push(format!("{table}.{extension}"));
+                }
+                Ok(OutputLocation::File(output_path))
             }
-            Ok(OutputLocation::File(output_path))
         }
     }
 

@@ -213,7 +213,7 @@ jobs:
           echo "======================================"
           if [ "${{ env.DUCKDB_NIGHTLY }}" = "true" ]; then
             # Use --pre to install pre-release dev builds (e.g., 1.4.4.dev48)
-            # Constraint <1.5.0 ensures we get 1.4.x dev builds which have extensions in core_nightly
+            # Constraint <1.5.0 ensures we get 1.4.x branch dev builds
             pip install "duckdb<1.5.0" --pre pyarrow pandas
           elif [ -n "${{ env.DUCKDB_VERSION }}" ]; then
             pip install "duckdb==${{ env.DUCKDB_VERSION }}" pyarrow pandas
@@ -224,11 +224,8 @@ jobs:
       
       - name: Pre-install DuckDB spatial extension
         run: |
-          if [ "${{ env.DUCKDB_NIGHTLY }}" = "true" ]; then
-            python -c "import duckdb; con = duckdb.connect(); con.execute('INSTALL spatial FROM core_nightly'); print('DuckDB spatial extension installed from core_nightly')"
-          else
-            python -c "import duckdb; con = duckdb.connect(); con.execute('INSTALL spatial'); print('DuckDB spatial extension installed')"
-          fi
+          # Dev builds don't have spatial extension in core_nightly, so always use default repo
+          python -c "import duckdb; con = duckdb.connect(); con.execute('INSTALL spatial'); print('DuckDB spatial extension installed')"
       
       - name: Run DuckDB benchmark
         run: |

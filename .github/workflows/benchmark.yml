@@ -212,8 +212,9 @@ jobs:
           echo "DUCKDB_VERSION: ${{ env.DUCKDB_VERSION }}"
           echo "======================================"
           if [ "${{ env.DUCKDB_NIGHTLY }}" = "true" ]; then
-            # Use 1.4 LTS nightly (duckdb<1.5.0) which has extensions available from core_nightly
-            pip install "duckdb<1.5.0" pyarrow pandas
+            # Use --pre to install pre-release dev builds (e.g., 1.4.4.dev48)
+            # Constraint <1.5.0 ensures we get 1.4.x dev builds which have extensions in core_nightly
+            pip install "duckdb<1.5.0" --pre pyarrow pandas
           elif [ -n "${{ env.DUCKDB_VERSION }}" ]; then
             pip install "duckdb==${{ env.DUCKDB_VERSION }}" pyarrow pandas
           else
@@ -319,7 +320,10 @@ jobs:
           echo "SEDONADB_VERSION: ${{ env.SEDONADB_VERSION }}"
           echo "========================================"
           if [ "${{ env.SEDONADB_NIGHTLY }}" = "true" ]; then
-            pip install "sedonadb[geopandas]" pandas pyarrow pyproj --extra-index-url https://repo.fury.io/sedona-nightlies/
+            # Use Gemfury as primary index to ensure nightly version is installed
+            pip install "sedonadb[geopandas]" pandas pyarrow pyproj \
+              --index-url https://repo.fury.io/sedona-nightlies/ \
+              --extra-index-url https://pypi.org/simple/
           elif [ -n "${{ env.SEDONADB_VERSION }}" ]; then
             pip install "sedonadb[geopandas]==${{ env.SEDONADB_VERSION }}" pandas pyarrow pyproj
           else
